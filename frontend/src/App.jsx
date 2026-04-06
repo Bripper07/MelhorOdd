@@ -40,7 +40,8 @@ export default function App() {
     setLoading(true);
     setError(null);
 
-    fetch(`/api/odds/${league}?regions=eu&markets=h2h&oddsFormat=decimal`, {
+    const apiBase = import.meta.env.VITE_API_URL ?? '';
+    fetch(`${apiBase}/api/odds/${league}?regions=eu&markets=h2h&oddsFormat=decimal`, {
       signal: controller.signal,
     })
       .then((r) => {
