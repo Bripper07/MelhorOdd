@@ -79,14 +79,23 @@ function OddCell({ value, isBest }) {
 }
 
 function MarginTooltip() {
-  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+
+  function show() {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.top - 8, left: r.left + r.width / 2 });
+  }
+  function hide() { setPos(null); }
+
   return (
-    <span className="relative inline-flex items-center">
+    <span className="inline-flex items-center" style={{ position: 'relative' }}>
       <button
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
+        ref={btnRef}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }}
         aria-label="O que é margem?"
       >
@@ -96,13 +105,15 @@ function MarginTooltip() {
           <circle cx="6.5" cy="3.8" r="0.7" fill="currentColor" />
         </svg>
       </button>
-      {open && (
+      {pos && (
         <span
-          className="absolute z-20 text-xs rounded-xl px-3 py-2 pointer-events-none"
+          className="text-xs rounded-xl px-3 py-2 pointer-events-none"
           style={{
-            bottom: 'calc(100% + 6px)',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            position: 'fixed',
+            zIndex: 9999,
+            top: pos.top,
+            left: pos.left,
+            transform: 'translate(-50%, -100%)',
             background: '#1e2535',
             border: '1px solid rgba(255,255,255,0.1)',
             color: '#d1d5db',
