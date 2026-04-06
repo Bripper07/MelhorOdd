@@ -22,6 +22,38 @@ function formatDate(iso) {
   });
 }
 
+function calcMargin(home, draw, away) {
+  const vals = [home, draw, away].filter(Boolean);
+  if (vals.length < 2) return null;
+  return (vals.reduce((sum, v) => sum + 1 / v, 0) - 1) * 100;
+}
+
+function marginColor(m) {
+  if (m < 5) return '#4ade80';   // green
+  if (m < 8) return '#facc15';   // yellow
+  return '#f87171';              // red
+}
+
+function marginBg(m) {
+  if (m < 5) return 'rgba(74,222,128,0.1)';
+  if (m < 8) return 'rgba(250,204,21,0.1)';
+  return 'rgba(248,113,113,0.1)';
+}
+
+function MarginBadge({ margin }) {
+  if (margin === null) return null;
+  const color = marginColor(margin);
+  const bg = marginBg(margin);
+  return (
+    <span
+      className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+      style={{ color, background: bg, whiteSpace: 'nowrap' }}
+    >
+      {margin.toFixed(1)}%
+    </span>
+  );
+}
+
 function OddCell({ value, isBest }) {
   if (!value) return <td className="px-3 py-3 text-center text-gray-600">—</td>;
 
@@ -46,6 +78,48 @@ function OddCell({ value, isBest }) {
   );
 }
 
+function MarginTooltip() {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex items-center">
+      <button
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }}
+        aria-label="O que é margem?"
+      >
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ color: '#4b5563', display: 'block' }}>
+          <circle cx="6.5" cy="6.5" r="6" stroke="currentColor" strokeWidth="1.2" />
+          <path d="M6.5 5.5v4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          <circle cx="6.5" cy="3.8" r="0.7" fill="currentColor" />
+        </svg>
+      </button>
+      {open && (
+        <span
+          className="absolute z-20 text-xs rounded-xl px-3 py-2 pointer-events-none"
+          style={{
+            bottom: 'calc(100% + 6px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#1e2535',
+            border: '1px solid rgba(255,255,255,0.1)',
+            color: '#d1d5db',
+            width: 200,
+            lineHeight: 1.5,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}
+        >
+          <strong style={{ color: '#e5e7eb' }}>Margem da casa</strong>
+          <br />
+          Quanto menor a margem, melhor para o apostador. Abaixo de 5% é ótimo.
+        </span>
+      )}
+    </span>
+  );
+}
+
 export default function MatchCard({ match }) {
   const { home_team, away_team, commence_time, bookmakers } = match;
   const [expanded, setExpanded] = useState(false);
@@ -59,8 +133,9 @@ export default function MatchCard({ match }) {
       const away = market.outcomes.find((o) => o.name === away_team)?.price;
       const draw = market.outcomes.find((o) => o.name === 'Draw')?.price;
       const vals = [home, draw, away].filter(Boolean);
-      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-      return { key: b.key, title: b.title, home, draw, away, avg };
+      const avg = vals.length ? vals.reduce((a, c) => a + c, 0) / vals.length : 0;
+      const margin = calcMargin(home, draw, away);
+      return { key: b.key, title: b.title, home, draw, away, avg, margin };
     })
     .filter(Boolean)
     .sort((a, b) => b.avg - a.avg);
@@ -71,6 +146,11 @@ export default function MatchCard({ match }) {
   const bestDraw = Math.max(...books.map((b) => b.draw ?? 0));
   const bestAway = Math.max(...books.map((b) => b.away ?? 0));
 
+  const marginsWithValue = books.map((b) => b.margin).filter((m) => m !== null);
+  const avgMargin = marginsWithValue.length
+    ? marginsWithValue.reduce((a, m) => a + m, 0) / marginsWithValue.length
+    : null;
+
   const topBooks = books.slice(0, TOP_N);
   const extraBooks = books.slice(TOP_N);
   const hasExtra = extraBooks.length > 0;
@@ -79,16 +159,15 @@ export default function MatchCard({ match }) {
     return (
       <tr
         className="transition-colors duration-150"
-        style={{
-          borderBottom: i < total - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-        }}
+        style={{ borderBottom: i < total - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
         onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
         onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
       >
         <td className="px-5 py-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <BookmakerLogo bookKey={b.key} title={b.title} />
             <span className="text-gray-400 text-xs font-medium">{b.title}</span>
+            <MarginBadge margin={b.margin} />
           </div>
         </td>
         <OddCell value={b.home} isBest={b.home === bestHome} />
@@ -128,6 +207,22 @@ export default function MatchCard({ match }) {
             <TeamCrest name={away_team} size={42} />
           </div>
         </div>
+
+        {/* Average margin summary */}
+        {avgMargin !== null && (
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-[11px]" style={{ color: '#4b5563' }}>Margem média:</span>
+            <span
+              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ color: marginColor(avgMargin), background: marginBg(avgMargin) }}
+            >
+              {avgMargin.toFixed(1)}%
+            </span>
+            <span className="text-[10px]" style={{ color: '#374151' }}>
+              {avgMargin < 5 ? '· ótimo para o apostador' : avgMargin < 8 ? '· margem média' : '· margem alta'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Odds table */}
@@ -135,7 +230,11 @@ export default function MatchCard({ match }) {
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <th className="text-left px-5 py-2.5 text-xs font-semibold uppercase tracking-wider" style={{ color: '#4b5563' }}>Casa</th>
+              <th className="text-left px-5 py-2.5 text-xs font-semibold uppercase tracking-wider" style={{ color: '#4b5563' }}>
+                <span className="flex items-center gap-1.5">
+                  Casa · Margem <MarginTooltip />
+                </span>
+              </th>
               <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-center" style={{ color: '#4b5563' }}>1 · Casa</th>
               <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-center" style={{ color: '#4b5563' }}>X · Empate</th>
               <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-center" style={{ color: '#4b5563' }}>2 · Fora</th>
