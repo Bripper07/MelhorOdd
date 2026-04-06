@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import TeamCrest from './TeamCrest';
 import BookmakerLogo from './BookmakerLogo';
 
@@ -78,18 +79,29 @@ function OddCell({ value, isBest }) {
   );
 }
 
+const TOOLTIP_WIDTH = 200;
+
 function MarginTooltip() {
   const [pos, setPos] = useState(null);
   const btnRef = useRef(null);
 
   function show() {
     const r = btnRef.current?.getBoundingClientRect();
-    if (r) setPos({ top: r.top - 8, left: r.left + r.width / 2 });
+    if (!r) return;
+    // Center on the icon, clamp so it never overflows off-screen
+    const rawLeft = r.left + r.width / 2;
+    const left = Math.min(
+      Math.max(rawLeft, TOOLTIP_WIDTH / 2 + 8),
+      window.innerWidth - TOOLTIP_WIDTH / 2 - 8
+    );
+    // bottom: distance from viewport bottom to icon top, plus gap
+    const bottom = window.innerHeight - r.top + 6;
+    setPos({ bottom, left });
   }
   function hide() { setPos(null); }
 
   return (
-    <span className="inline-flex items-center" style={{ position: 'relative' }}>
+    <span className="inline-flex items-center">
       <button
         ref={btnRef}
         onMouseEnter={show}
@@ -105,27 +117,31 @@ function MarginTooltip() {
           <circle cx="6.5" cy="3.8" r="0.7" fill="currentColor" />
         </svg>
       </button>
-      {pos && (
+      {pos && createPortal(
         <span
-          className="text-xs rounded-xl px-3 py-2 pointer-events-none"
           style={{
             position: 'fixed',
             zIndex: 9999,
-            top: pos.top,
+            bottom: pos.bottom,
             left: pos.left,
-            transform: 'translate(-50%, -100%)',
+            transform: 'translateX(-50%)',
             background: '#1e2535',
             border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 12,
             color: '#d1d5db',
-            width: 200,
+            fontSize: 12,
             lineHeight: 1.5,
+            padding: '8px 12px',
+            width: TOOLTIP_WIDTH,
             boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            pointerEvents: 'none',
           }}
         >
           <strong style={{ color: '#e5e7eb' }}>Margem da casa</strong>
           <br />
           Quanto menor a margem, melhor para o apostador. Abaixo de 5% é ótimo.
-        </span>
+        </span>,
+        document.body
       )}
     </span>
   );
